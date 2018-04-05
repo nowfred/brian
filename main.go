@@ -1,58 +1,54 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/gocolly/colly"
 )
 
-func main() {
-	// Instantiate default collector
-	//disallowedDomainOne, _ := regexp.Compile("twitter.com")
-	//disallowedDomainTwo, _ := regexp.Compile("google.com")
-	//disallowedDomainThree, _ := regexp.Compile("facebook.com")
-	disallowedDomains := []string{
-		"twitter.com", "google.com",
-		"google.es", "facebook.com",
-		"nakedcapitalism.com/author", "apple.com",
-		"mozilla.org", "wsj.com", "youtube.com", "pixels.com", "shopify.com",
-		"pinterest.com", "footbie.com", "linkedin.com", ".wikimedia.", "wikipedia.", "digg.com", "myspace.com"}
+var (
+	folder = "data"
+)
 
+func encode(url string) string {
+	uEnc := base64.URLEncoding.EncodeToString([]byte(url))
+	return uEnc
+}
+
+func collect(domain string) {
 	c := colly.NewCollector(
-		// Visit only domains: hackerspaces.org, wiki.hackerspaces.org
-		colly.MaxDepth(1),
-		colly.AllowedDomains("deadspin.com"),
-		//colly.Async(true),
+		colly.AllowedDomains(domain),
 	)
-
-	//c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 2})
 
 	// On every a element which has href attribute call callback
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		uri := e.Request.AbsoluteURL(link)
-		// Print link
-		fmt.Printf("Link found: %q -> %s\n", e.Text, link)
-		// Visit link found on page
-		// Only those links are visited which are in AllowedDomains
-		shouldI := true
-		for _, d := range disallowedDomains {
-			if strings.Contains(uri, d) {
-				shouldI = false
-			}
-		}
-		if shouldI {
-			c.Visit(uri)
-		}
+		c.Visit(uri)
 	})
 
-	// Before making a request print "Visiting ..."
 	c.OnRequest(func(r *colly.Request) {
 		fmt.Println("Visiting", r.URL.String())
 	})
 
-	//c.Visit("https://nakedcapitalism.com/")
-	c.Visit("https://deadspin.com")
-	//c.Wait()
+	c.OnResponse(func(r *colly.Response) {
+		t := time.Now().UTC().UnixNano()
+		h := encode(r.Request.URL.String())
+		f := fmt.Sprintf("%s/%d_%s.html", folder, t, h)
+		r.Save(f)
+	})
+
+	c.Visit(domain)
+}
+
+func main() {
+
+	domains := []string{"deadspin.com", "nakedcapitalism.com", "arstechnica.com"}
+
+	for _, d := range domains {
+		go collect(d)
+	}
+	select {}
 }
