@@ -34,18 +34,23 @@ func collect(domain string) {
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		t := time.Now().UTC().UnixNano()
-		h := encode(r.Request.URL.String())
-		f := fmt.Sprintf("%s/%d_%s.html", folder, t, h)
-		r.Save(f)
-	})
+		if r.StatusCode == 200 {
+			t := time.Now().UTC().UnixNano()
+			h := encode(r.Request.URL.String())
+			f := fmt.Sprintf("%s/%d_%s.html", folder, t, h)
+			r.Save(f)
+		} else {
+			fmt.Println("ERROR ON", r.Request.URL.String())
+		}
 
-	c.Visit(domain)
+	})
+	prefixed := fmt.Sprintf("https://%s", domain)
+	c.Visit(prefixed)
 }
 
 func main() {
 
-	domains := []string{"deadspin.com", "nakedcapitalism.com", "arstechnica.com"}
+	domains := []string{"deadspin.com", "www.nakedcapitalism.com", "arstechnica.com"}
 
 	for _, d := range domains {
 		go collect(d)
